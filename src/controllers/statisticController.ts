@@ -1,19 +1,47 @@
-// src/controllers/statisticController.ts (Orang A)
-// Referensi modul: 15 (count, aggregate, groupBy), 13.2 (getPostStats + Promise.all)
 import type { Request, Response } from "express";
 import prisma from "../config/prisma";
-import { HttpError } from "../utils/http-error";
-import { sendSuccess } from "../utils/response";
 
 // GET /api/statistics
-export const getStatistics = async (req: Request, res: Response) => {
-  // TODO:
-  // - totalPlayers      : prisma.player.count()
-  // - totalHeroesOwned  : prisma.playerHero.count()
-  // - totalDiamond      : prisma.player.aggregate({ _sum: { diamond: true } })
-  // - mostOwnedHero     : playerHero.groupBy by heroId, orderBy _count desc, take 1,
-  //                       lalu ambil nama hero-nya + jumlah pemilik
-  // - heroesPerRole     : hero.groupBy by role, _count
-  // Jalankan yang tidak saling bergantung dengan Promise.all
-  throw new HttpError(501, "getStatistics belum diimplementasikan");
+export const getStatistics = async (_req: Request, res: Response) => {
+  const [totalPlayers, totalHeroesOwned, diamondSum, topOwned, roleGroups] =
+    await Promise.all([
+      prisma.player.count(),
+      prisma.playerHero.count(),
+      prisma.player.aggregate({ _sum: { diamond: true } }),
+      // Hero paling banyak dimiliki; heroId asc sebagai pemecah seri supaya hasil stabil
+      prisma.playerHero.groupBy({
+        by: ["heroId"],
+        _count: { heroId: true },
+        orderBy: [{ _count: { heroId: "desc" } }, { heroId: "asc" }],
+        take: 1,
+      }),
+      prisma.hero.groupBy({
+        by: ["role"],
+        _count: { role: true },
+        orderBy: [{ _count: { role: "desc" } }, { role: "asc" }],
+      }),
+    ]);
+
+  let mostOwnedHero: { heroId: number; name: string; owners: number } | null = null;
+  if (topOwned.length > 0) {
+    const top = topOwned[0];
+    const hero = await prisma.hero.findUnique({ where: { id: top.heroId } });
+    mostOwnedHero = {
+      heroId: top.heroId,
+      name: hero?.name ?? "Unknown",
+      owners: top._count.heroId,
+    };
+  }
+
+  res.status(200).json({
+    status: true,
+    message: "Berhasil mengambil statistik",
+    data: {
+      totalPlayers,
+      totalHeroesOwned,
+      totalDiamond: diamondSum._sum.diamond ?? 0,
+      mostOwnedHero,
+      heroesPerRole: roleGroups.map((r) => ({ role: r.role, total: r._count.role })),
+    },
+  });
 };
