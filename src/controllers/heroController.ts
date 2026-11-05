@@ -1,5 +1,4 @@
-// src/controllers/heroController.ts (Orang B)
-// Referensi modul: 13.2 (getAllPosts, getPostById, createPost), 14 (filtering & pagination)
+// src/controllers/heroController.ts
 import type { Request, Response } from "express";
 import prisma from "../config/prisma";
 import type { Lane, Role } from "../generated/prisma/client";

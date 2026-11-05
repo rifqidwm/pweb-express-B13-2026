@@ -1,4 +1,4 @@
-// src/routes/skin.routes.ts (Orang B)
+// src/routes/skin.routes.ts
 import { Router } from "express";
 import { getAllSkins, getSkinById } from "../controllers/skinController";
 

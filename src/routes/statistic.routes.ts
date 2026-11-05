@@ -1,4 +1,4 @@
-// src/routes/statistic.routes.ts (Orang A)
+// src/routes/statistic.routes.ts
 import { Router } from "express";
 import { getStatistics } from "../controllers/statisticController";
 

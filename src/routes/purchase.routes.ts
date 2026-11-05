@@ -1,4 +1,4 @@
-// src/routes/purchase.routes.ts (Orang A)
+// src/routes/purchase.routes.ts
 // Dipasang di prefix /players juga (lihat routes/index.ts),
 // jadi URL lengkapnya POST /api/players/:player_id/heroes
 import { Router } from "express";

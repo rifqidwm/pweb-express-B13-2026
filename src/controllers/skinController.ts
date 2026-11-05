@@ -1,5 +1,4 @@
-// src/controllers/skinController.ts (Orang B)
-// Referensi modul: 13.2 (include relasi), 14 (filtering & pagination)
+// src/controllers/skinController.ts
 import type { Request, Response } from "express";
 import prisma from "../config/prisma";
 import type { Rarity } from "../generated/prisma/client";

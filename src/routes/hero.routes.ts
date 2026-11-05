@@ -1,4 +1,4 @@
-// src/routes/hero.routes.ts (Orang B)
+// src/routes/hero.routes.ts
 import { Router } from "express";
 import { createHero, getAllHeroes, getHeroById } from "../controllers/heroController";
 
