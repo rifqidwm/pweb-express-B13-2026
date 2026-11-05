@@ -1,61 +1,150 @@
-// src/controllers/playerController.ts (Orang C)
-// Referensi modul: 13.1 (CRUD userController), 16.2 (increment)
 import type { Request, Response } from "express";
 import prisma from "../config/prisma";
 import { HttpError } from "../utils/http-error";
 import { parseId } from "../utils/parse";
 import { sendSuccess } from "../utils/response";
 
-// POST /api/players  body: { nickname }
+const playerSelect = {
+  id: true,
+  nickname: true,
+  bp: true,
+  diamond: true,
+  createdAt: true,
+};
+
 export const createPlayer = async (req: Request, res: Response) => {
-  // TODO:
-  // 1. nickname kosong -> 400
-  // 2. nickname sudah dipakai -> 409
-  // 3. create (bp & diamond dari default schema) -> 201
-  throw new HttpError(501, "createPlayer belum diimplementasikan");
+  const { nickname } = req.body ?? {};
+
+  if (typeof nickname !== "string" || !nickname.trim()) {
+    throw new HttpError(400, "Nickname wajib diisi");
+  }
+
+  const existingPlayer = await prisma.player.findUnique({
+    where: { nickname: nickname.trim() },
+  });
+  if (existingPlayer) {
+    throw new HttpError(409, "Nickname sudah dipakai");
+  }
+
+  const player = await prisma.player.create({
+    data: { nickname: nickname.trim() },
+    select: playerSelect,
+  });
+
+  sendSuccess(res, 201, "Player berhasil dibuat", player);
 };
 
-// GET /api/players/:player_id
 export const getPlayerById = async (req: Request, res: Response) => {
-  // TODO:
-  // - parseId(req.params.player_id)
-  // - findUnique + include heroes (PlayerHero) beserta data hero-nya
-  // - tidak ada -> 404
-  throw new HttpError(501, "getPlayerById belum diimplementasikan");
+  const id = parseId(req.params.player_id);
+
+  const player = await prisma.player.findUnique({
+    where: { id },
+    select: {
+      ...playerSelect,
+      heroes: {
+        select: {
+          heroId: true,
+          currency: true,
+          pricePaid: true,
+          hero: { select: { name: true } },
+        },
+        orderBy: { id: "asc" },
+      },
+    },
+  });
+
+  if (!player) throw new HttpError(404, "Player tidak ditemukan");
+
+  const data = {
+    ...player,
+    heroes: player.heroes.map((item) => ({
+      heroId: item.heroId,
+      name: item.hero.name,
+      currency: item.currency,
+      pricePaid: item.pricePaid,
+    })),
+  };
+
+  sendSuccess(res, 200, "Berhasil mengambil data player", data);
 };
 
-// PATCH /api/players/:player_id  body: { nickname }
 export const updatePlayer = async (req: Request, res: Response) => {
-  // TODO (urutan soal, BEDA dengan updateUser di modul, jadi cek manual):
-  // 1. player tidak ada (findUnique) -> 404
-  // 2. nickname kosong -> 400
-  // 3. nickname sudah dipakai player LAIN -> 409
-  // 4. update -> 200
-  throw new HttpError(501, "updatePlayer belum diimplementasikan");
+  const id = parseId(req.params.player_id);
+  const { nickname } = req.body ?? {};
+
+  // Cek manual karena urutan soal 404 -> 400 -> 409
+  const player = await prisma.player.findUnique({ where: { id } });
+  if (!player) throw new HttpError(404, "Player tidak ditemukan");
+
+  if (typeof nickname !== "string" || !nickname.trim()) {
+    throw new HttpError(400, "Nickname wajib diisi");
+  }
+
+  const nicknameOwner = await prisma.player.findUnique({
+    where: { nickname: nickname.trim() },
+  });
+  if (nicknameOwner && nicknameOwner.id !== id) {
+    throw new HttpError(409, "Nickname sudah dipakai player lain");
+  }
+
+  const updatedPlayer = await prisma.player.update({
+    where: { id },
+    data: { nickname: nickname.trim() },
+    select: playerSelect,
+  });
+
+  sendSuccess(res, 200, "Player berhasil diupdate", updatedPlayer);
 };
 
-// DELETE /api/players/:player_id
 export const deletePlayer = async (req: Request, res: Response) => {
-  // TODO:
-  // - prisma.player.delete; jika tidak ada, P2025 -> 404 (errorHandler)
-  // - PlayerHero ikut terhapus karena onDelete: Cascade
-  throw new HttpError(501, "deletePlayer belum diimplementasikan");
+  const id = parseId(req.params.player_id);
+
+  await prisma.player.delete({ where: { id } });
+
+  sendSuccess(res, 200, "Player berhasil dihapus");
 };
 
-// POST /api/players/:player_id/topup  body: { amount }
 export const topUpDiamond = async (req: Request, res: Response) => {
-  // TODO:
-  // 1. amount bukan bilangan bulat > 0 -> 400 (Number.isInteger)
-  // 2. player tidak ada -> 404
-  // 3. update diamond: { increment: amount } -> 200 + saldo diamond terbaru
-  throw new HttpError(501, "topUpDiamond belum diimplementasikan");
+  const id = parseId(req.params.player_id);
+  const { amount } = req.body ?? {};
+
+  if (!Number.isInteger(amount) || amount <= 0) {
+    throw new HttpError(400, "Amount harus bilangan bulat lebih dari 0");
+  }
+
+  const player = await prisma.player.update({
+    where: { id },
+    data: { diamond: { increment: amount } },
+    select: { id: true, diamond: true },
+  });
+
+  sendSuccess(res, 200, "Top up berhasil", {
+    playerId: player.id,
+    amount,
+    diamond: player.diamond,
+  });
 };
 
-// POST /api/players/:player_id/matches  body: { result: "WIN" | "LOSE" }
 export const playMatch = async (req: Request, res: Response) => {
-  // TODO:
-  // 1. result bukan WIN/LOSE -> 400
-  // 2. player tidak ada -> 404
-  // 3. update bp: { increment: WIN 300 / LOSE 100 } -> 200 + BP didapat + saldo BP terbaru
-  throw new HttpError(501, "playMatch belum diimplementasikan");
+  const id = parseId(req.params.player_id);
+  const { result } = req.body ?? {};
+
+  if (result !== "WIN" && result !== "LOSE") {
+    throw new HttpError(400, "Result harus WIN atau LOSE");
+  }
+
+  const bpEarned = result === "WIN" ? 300 : 100;
+
+  const player = await prisma.player.update({
+    where: { id },
+    data: { bp: { increment: bpEarned } },
+    select: { id: true, bp: true },
+  });
+
+  sendSuccess(res, 200, "Hadiah match berhasil ditambahkan", {
+    playerId: player.id,
+    result,
+    bpEarned,
+    bp: player.bp,
+  });
 };
